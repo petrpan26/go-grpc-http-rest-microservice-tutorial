@@ -6,7 +6,7 @@ import "google/protobuf/timestamp.proto";
 // Taks we have to do
 message ToDo {
     // Unique integer identifier of the todo task
-    int64 id = 1;
+    string id = 1;
 
     // Title of the task
     string title = 2;
@@ -33,7 +33,7 @@ message CreateResponse{
     string api = 1;
 
     // ID of created task
-    int64 id = 2;
+    string id = 2;
 }
 
 // Request data to read todo task
@@ -42,7 +42,7 @@ message ReadRequest{
     string api = 1;
 
     // Unique integer identifier of the todo task
-    int64 id = 2;
+    string id = 2;
 }
 
 // Contains todo task data specified in by ID request
@@ -79,7 +79,7 @@ message DeleteRequest{
     string api = 1;
 
     // Unique integer identifier of the todo task to delete
-    int64 id = 2;
+    string id = 2;
 }
 
 // Contains status of delete operation

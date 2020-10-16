@@ -2,17 +2,17 @@ package v1
 
 import (
 	"context"
-	"errors"
-	"reflect"
+	"io/ioutil"
+	"log"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/timestamp"
 
 	as "github.com/aerospike/aerospike-client-go"
 	"github.com/petrpan26/go-grpc-http-rest-microservice-tutorial/pkg/api/v1"
 	testcontainers "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func Test_toDoServiceServer_Create(t *testing.T) {
@@ -30,6 +30,7 @@ func Test_toDoServiceServer_Create(t *testing.T) {
 		t.Error(err)
 	}
 	defer asClient.Terminate(ctx)
+	time.Sleep(5 * time.Second)
 	ip, err := asClient.Host(ctx)
 	if err != nil {
 		t.Error(err)
@@ -38,133 +39,36 @@ func Test_toDoServiceServer_Create(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	db := &as.NewClient(ip, port.Port())
+	logg, err := asClient.Logs(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+	x, err := ioutil.ReadAll(logg)
+	if err != nil {
+		t.Error(err)
+	}
+	log.Print(string(x))
+	db, err := as.NewClient(ip, port.Int())
+	if err != nil {
+		t.Error(err)
+	}
 	s := NewToDoServiceServer(db)
+	log.Print("Done setting up")
 	tm := time.Now().In(time.UTC)
 	reminder, _ := ptypes.TimestampProto(tm)
-
-	type args struct {
-		ctx context.Context
-		req *v1.CreateRequest
-	}
-	tests := []struct {
-		name    string
-		s       v1.ToDoServiceServer
-		args    args
-		mock    func()
-		want    *v1.CreateResponse
-		wantErr bool
-	}{
-		{
-			name: "OK",
-			s:    s,
-			args: args{
-				ctx: ctx,
-				req: &v1.CreateRequest{
-					Api: "v1",
-					ToDo: &v1.ToDo{
-						Title:       "title",
-						Description: "description",
-						Reminder:    reminder,
-					},
-				},
-			},
-			mock: func() {
-			},
-			want: &v1.CreateResponse{
-				Api: "v1",
-				Id:  1,
-			},
-		},
-		{
-			name: "Unsupported API",
-			s:    s,
-			args: args{
-				ctx: ctx,
-				req: &v1.CreateRequest{
-					Api: "v1000",
-					ToDo: &v1.ToDo{
-						Title:       "title",
-						Description: "description",
-						Reminder: &timestamp.Timestamp{
-							Seconds: 1,
-							Nanos:   -1,
-						},
-					},
-				},
-			},
-			mock:    func() {},
-			wantErr: true,
-		},
-		{
-			name: "Invalid Reminder field format",
-			s:    s,
-			args: args{
-				ctx: ctx,
-				req: &v1.CreateRequest{
-					Api: "v1",
-					ToDo: &v1.ToDo{
-						Title:       "title",
-						Description: "description",
-						Reminder: &timestamp.Timestamp{
-							Seconds: 1,
-							Nanos:   -1,
-						},
-					},
-				},
-			},
-			mock:    func() {},
-			wantErr: true,
-		},
-		{
-			name: "INSERT failed",
-			s:    s,
-			args: args{
-				ctx: ctx,
-				req: &v1.CreateRequest{
-					Api: "v1",
-					ToDo: &v1.ToDo{
-						Title:       "title",
-						Description: "description",
-						Reminder:    reminder,
-					},
-				},
-			},
-			mock: func() {
-			},
-			wantErr: true,
-		},
-		{
-			name: "LastInsertId failed",
-			s:    s,
-			args: args{
-				ctx: ctx,
-				req: &v1.CreateRequest{
-					Api: "v1",
-					ToDo: &v1.ToDo{
-						Title:       "title",
-						Description: "description",
-						Reminder:    reminder,
-					},
-				},
-			},
-			mock: func() {
-			},
-			wantErr: true,
+	ti := time.Now().In(time.UTC)
+	pfx := ti.Format(time.RFC3339Nano)
+	req1 := v1.CreateRequest{
+		Api: apiVersion,
+		ToDo: &v1.ToDo{
+			Title:       "title (" + pfx + ")",
+			Description: "description (" + pfx + ")",
+			Reminder:    reminder,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.mock()
-			got, err := tt.s.Create(tt.args.ctx, tt.args.req)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("toDoServiceServer.Create() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if err == nil && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("toDoServiceServer.Create() = %v, want %v", got, tt.want)
-			}
-		})
+	res1, err := s.Create(ctx, &req1)
+	if len(res1.Id) == 0 {
+		t.Error("Oops")
 	}
 }
 

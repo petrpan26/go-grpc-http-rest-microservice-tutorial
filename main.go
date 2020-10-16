@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	client, err := as.NewClient("172.17.0.2", 3000)
+	client, err := as.NewClient("54.236.62.49", 3000)
 	if err != nil {
 		log.Fatal("ok0" + err.Error())
 	}

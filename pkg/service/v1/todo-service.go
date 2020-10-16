@@ -4,7 +4,6 @@ import (
 	"context"
 	as "github.com/aerospike/aerospike-client-go"
 
-	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -60,11 +59,11 @@ func (s *toDoServiceServer) Create(ctx context.Context, req *v1.CreateRequest) (
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "can't create new key "+err.Error())
 	}
-	title := as.NewBin("title", req.ToDo.Title)
-	description := as.NewBin("description", req.ToDo.Description)
-	reminder := as.NewBin("reminder", reminder.Unix())
+	titleBin := as.NewBin("title", req.ToDo.Title)
+	descriptionBin := as.NewBin("description", req.ToDo.Description)
+	reminderBin := as.NewBin("reminder", reminder.Unix())
 
-	err := s.db.PutBins(key, title, description, reminder)
+	err = s.db.PutBins(nil, key, titleBin, descriptionBin, reminderBin)
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "can't add new key "+err.Error())
 	}
@@ -82,22 +81,25 @@ func (s *toDoServiceServer) Read(ctx context.Context, req *v1.ReadRequest) (*v1.
 		return nil, err
 	}
 
+	key, err := as.NewKey("test", "task", req.Id)
+	if err != nil {
+		return nil, status.Error(codes.Unavailable, "can't add new key "+err.Error())
+	}
 	// query ToDo by ID
-	record, err := s.db.Get(nil, req.Key)
+	record, err := s.db.Get(nil, key)
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "Can't get todo "+err.Error())
 	}
 
 	// get ToDo data
 	var td v1.ToDo
-	var reminder time.Time
-	td.Reminder, err = ptypes.TimestampProto(time.Unix(record.Bins["reminder"]))
+	td.Reminder, err = ptypes.TimestampProto(time.Unix(int64(record.Bins["reminder"].(int)), 0))
 	if err != nil {
 		return nil, status.Error(codes.Unknown, "reminder field has invalid format-> "+err.Error())
 	}
 
-	td.Title = record.Bins["title"]
-	td.Description = record.Bins["description"]
+	td.Title = record.Bins["title"].(string)
+	td.Description = record.Bins["description"].(string)
 
 	return &v1.ReadResponse{
 		Api:  apiVersion,
@@ -132,22 +134,22 @@ func (s *toDoServiceServer) Update(ctx context.Context, req *v1.UpdateRequest) (
 	}
 
 	if !exist {
-		return &v1.CreateResponse{
+		return &v1.UpdateResponse{
 			Api:     apiVersion,
 			Updated: 0,
 		}, nil
 	}
 
-	title := as.NewBin("title", req.ToDo.Title)
-	description := as.NewBin("description", req.ToDo.Description)
-	reminder := as.NewBin("reminder", reminder.Unix())
+	titleBin := as.NewBin("title", req.ToDo.Title)
+	descriptionBin := as.NewBin("description", req.ToDo.Description)
+	reminderBin := as.NewBin("reminder", reminder.Unix())
 
-	err := s.db.PutBins(key, title, description, reminder)
+	err = s.db.PutBins(nil, key, titleBin, descriptionBin, reminderBin)
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "can't update todo "+err.Error())
 	}
 
-	return &v1.CreateResponse{
+	return &v1.UpdateResponse{
 		Api:     apiVersion,
 		Updated: 1,
 	}, nil
@@ -173,9 +175,9 @@ func (s *toDoServiceServer) Delete(ctx context.Context, req *v1.DeleteRequest) (
 		deleted = 0
 	}
 
-	return &v1.ReadResponse{
+	return &v1.DeleteResponse{
 		Api:     apiVersion,
-		Deleted: deleted,
+		Deleted: int64(deleted),
 	}, nil
 }
 
@@ -193,7 +195,6 @@ func (s *toDoServiceServer) ReadAll(ctx context.Context, req *v1.ReadAllRequest)
 
 	recs, err := s.db.ScanAll(spolicy, "test", "task")
 
-	var reminder time.Time
 	list := []*v1.ToDo{}
 	if err != nil {
 		return nil, status.Error(codes.Unknown, "failed to retrieve data from ToDo-> "+err.Error())
@@ -204,15 +205,14 @@ func (s *toDoServiceServer) ReadAll(ctx context.Context, req *v1.ReadAllRequest)
 			return nil, status.Error(codes.Unknown, "failed to retrieve data from ToDo-> "+err.Error())
 		} else {
 			var td v1.ToDo
-			var reminder time.Time
-			td.Reminder, err = ptypes.TimestampProto(time.Unix(res.Record.Bins["reminder"]))
+			td.Reminder, err = ptypes.TimestampProto(time.Unix(int64(rec.Record.Bins["reminder"].(int)), 0))
 			if err != nil {
 				return nil, status.Error(codes.Unknown, "reminder field has invalid format-> "+err.Error())
 			}
 
-			td.Title = res.Record.Bins["title"]
-			td.Description = res.Record.Bins["description"]
-			append(list, &td)
+			td.Title = rec.Record.Bins["title"].(string)
+			td.Description = rec.Record.Bins["description"].(string)
+			list = append(list, &td)
 		}
 	}
 

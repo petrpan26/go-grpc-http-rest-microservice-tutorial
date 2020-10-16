@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/petrpan26/go-grpc-http-rest-microservice-tutorial/pkg/api/v1"
 	"google.golang.org/grpc"
 )
 
